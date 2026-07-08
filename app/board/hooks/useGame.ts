@@ -26,7 +26,11 @@ export function useGame(roomId: string) {
 
   const myHandRef = useRef(myHand);
   const pickStatusRef = useRef(pickStatus);
+  const playersRef = useRef<PlayerData[]>([]);
   const engineStarted = useRef(false);
+  const [leftPlayerNotice, setLeftPlayerNotice] = useState<string | null>(
+    null,
+  );
 
   const hostLock = useRef(false);
 
@@ -43,6 +47,9 @@ export function useGame(roomId: string) {
   useEffect(() => {
     pickStatusRef.current = pickStatus;
   }, [pickStatus]);
+  useEffect(() => {
+    playersRef.current = players;
+  }, [players]);
 
   useEffect(() => {
     if (!isBrowser) return;
@@ -52,6 +59,110 @@ export function useGame(roomId: string) {
     const savedMatch = localStorage.getItem("eiigo_jogadores_partida");
     if (savedMatch) setPlayers(JSON.parse(savedMatch));
   }, [isBrowser]);
+
+  // Sessão do jogador: detecta saída (própria ou de outros) durante a
+  // partida, encerra a sessão local no fechamento do navegador e faz o
+  // reassumo de host caso quem saiu fosse o host.
+  useEffect(() => {
+    if (!isBrowser || !roomId || !myId) return;
+
+    const presenceChannel = supabase
+      .channel(`player_presence_${roomId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "players",
+          filter: `room_id=eq.${roomId}`,
+        },
+        async (payload) => {
+          const removedId = payload.old?.id as string | undefined;
+          if (!removedId || removedId === myId) return;
+
+          const removedPlayer = playersRef.current.find(
+            (p) => p.id === removedId,
+          );
+
+          setPlayers((prev) => prev.filter((p) => p.id !== removedId));
+          setPickStatus((prev) => {
+            const next = { ...prev };
+            delete next[removedId];
+            return next;
+          });
+          setCardCounts((prev) => {
+            const next = { ...prev };
+            delete next[removedId];
+            return next;
+          });
+
+          if (removedPlayer) {
+            setLeftPlayerNotice(`${removedPlayer.nome} saiu da partida`);
+            setTimeout(() => setLeftPlayerNotice(null), 4000);
+          }
+
+          if (removedPlayer?.is_host) {
+            const remaining = playersRef.current.filter(
+              (p) => p.id !== removedId,
+            );
+            const oldest = [...remaining].sort(
+              (a, b) =>
+                new Date(a.created_at || 0).getTime() -
+                new Date(b.created_at || 0).getTime(),
+            )[0];
+            if (oldest && oldest.id === myId) {
+              await supabase
+                .from("players")
+                .update({ is_host: true })
+                .eq("id", myId);
+              localStorage.setItem("eiigo_is_host", "true");
+            }
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "players",
+          filter: `room_id=eq.${roomId}`,
+        },
+        (payload) => {
+          if (payload.new.id === myId && payload.new.is_host) {
+            localStorage.setItem("eiigo_is_host", "true");
+          }
+          setPlayers((prev) =>
+            prev.map((p) =>
+              p.id === payload.new.id
+                ? { ...p, is_host: payload.new.is_host }
+                : p,
+            ),
+          );
+        },
+      )
+      .subscribe();
+
+    const handleUnload = () => {
+      supabase.from("players").delete().eq("id", myId).then();
+    };
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+      window.removeEventListener("beforeunload", handleUnload);
+    };
+  }, [isBrowser, roomId, myId]);
+
+  const handleLeaveGame = async () => {
+    if (!myId) return;
+    await supabase.from("players").delete().eq("id", myId);
+    localStorage.removeItem("eiigo_player_id");
+    localStorage.removeItem("eiigo_is_host");
+    localStorage.removeItem("eiigo_jogadores_partida");
+    if (roomId) localStorage.removeItem(`eiigo_turn_start_${roomId}`);
+    navigate("/");
+  };
 
   const opponents = players.filter((j) => j.id !== myId);
   const seatPositions =
@@ -327,8 +438,6 @@ export function useGame(roomId: string) {
 
     stagedCardIdsRef.current = [];
     hasCommitted.current = false;
-    timeLeftRef.current = 10;
-    setTimeLeft(10);
 
     const commitSelection = async () => {
       if (hasCommitted.current) return;
@@ -359,17 +468,62 @@ export function useGame(roomId: string) {
         .eq("id", myId);
     };
 
-    timerRef.current = setInterval(() => {
-      timeLeftRef.current -= 1;
-      setTimeLeft(timeLeftRef.current);
-      if (timeLeftRef.current === 4) {
-        playSound("countdown");
-      }
-      if (timeLeftRef.current <= 0) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        commitSelection();
-      }
-    }, 1000);
+    // O turno tem um início compartilhado (gravado quando o broadcast
+    // "reveal_and_pass" é recebido, por todos os clientes praticamente ao
+    // mesmo tempo). Isso evita que um refresh de página reinicie a
+    // contagem local em 10, o que travava os demais jogadores esperando.
+    const turnStartKey = `eiigo_turn_start_${roomId}`;
+    let turnStart = Number(localStorage.getItem(turnStartKey)) || 0;
+    if (!turnStart) {
+      turnStart = Date.now();
+      localStorage.setItem(turnStartKey, String(turnStart));
+    }
+    const elapsedSeconds = Math.floor((Date.now() - turnStart) / 1000);
+    const initialTimeLeft = Math.max(0, 10 - elapsedSeconds);
+    timeLeftRef.current = initialTimeLeft;
+    setTimeLeft(initialTimeLeft);
+
+    if (initialTimeLeft <= 0) {
+      commitSelection();
+    } else {
+      timerRef.current = setInterval(() => {
+        timeLeftRef.current -= 1;
+        setTimeLeft(timeLeftRef.current);
+        if (timeLeftRef.current === 4) {
+          playSound("countdown");
+        }
+        if (timeLeftRef.current <= 0) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          commitSelection();
+        }
+      }, 1000);
+    }
+
+    // Reconciliação: se um evento realtime de outro jogador se perder, essa
+    // sondagem periódica busca o estado real do banco e corrige o
+    // pickStatus local, evitando que o turno fique travado em "Aguardando".
+    const reconcileInterval = setInterval(async () => {
+      const { data: freshPlayers } = await supabase
+        .from("players")
+        .select("id, has_picked, cards_left")
+        .eq("room_id", roomId);
+      if (!freshPlayers) return;
+
+      setPickStatus((prev) => {
+        const next = { ...prev };
+        freshPlayers.forEach((p) => {
+          next[p.id] = p.has_picked ?? false;
+        });
+        return next;
+      });
+      setCardCounts((prev) => {
+        const next = { ...prev };
+        freshPlayers.forEach((p) => {
+          if (p.cards_left != null) next[p.id] = p.cards_left;
+        });
+        return next;
+      });
+    }, 1500);
 
     const handleCardClick = (event: MouseEvent) => {
       if (hasCommitted.current || timeLeftRef.current <= 0) return;
@@ -407,6 +561,7 @@ export function useGame(roomId: string) {
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      clearInterval(reconcileInterval);
       if (myHandEl) myHandEl.removeEventListener("click", handleCardClick);
       supabase.removeChannel(gameChannel);
       supabase.removeChannel(roomChannel);
@@ -427,5 +582,7 @@ export function useGame(roomId: string) {
     tableCards,
     timeLeft,
     hashiAvailable,
+    leftPlayerNotice,
+    handleLeaveGame,
   };
 }
