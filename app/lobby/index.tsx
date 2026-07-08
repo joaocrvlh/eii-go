@@ -21,6 +21,7 @@ export function Lobby() {
   const [isMounted, setIsMounted] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
   const [copied, setCopied] = useState(false);
+  const [roomFull, setRoomFull] = useState(false);
   const maxPlayers = 5;
 
   const joinLock = useRef(false);
@@ -154,6 +155,17 @@ export function Lobby() {
       }
 
       if (!validPlayerId) {
+        const { count } = await supabase
+          .from("players")
+          .select("id", { count: "exact", head: true })
+          .eq("room_id", roomId);
+
+        if ((count ?? 0) >= maxPlayers) {
+          setRoomFull(true);
+          joinLock.current = false;
+          return;
+        }
+
         const { data, error } = await supabase
           .from("players")
           .insert([
@@ -171,6 +183,16 @@ export function Lobby() {
         if (data && !error) {
           myPlayerIdRef.current = data.id;
           localStorage.setItem("eiigo_player_id", data.id);
+        } else if (error) {
+          // Backstop for a race where two players join at once past the
+          // client-side count check above (see README for the DB trigger).
+          if (error.message?.toLowerCase().includes("room_full")) {
+            setRoomFull(true);
+          } else {
+            console.error("Erro ao entrar na sala:", error);
+          }
+          joinLock.current = false;
+          return;
         }
       } else {
         await supabase
@@ -215,6 +237,8 @@ export function Lobby() {
           id: p.id,
           nome: p.nickname,
           avatar: p.avatar_url,
+          is_host: p.is_host,
+          created_at: p.created_at,
         })),
       ),
     );
@@ -276,6 +300,23 @@ export function Lobby() {
   };
 
   if (!isMounted) return null;
+
+  if (roomFull) {
+    return (
+      <main className="main-container lobby-container">
+        <section className="lobby-card room-full-card">
+          <h2>SALA CHEIA</h2>
+          <p>
+            Essa sala já atingiu o limite de {maxPlayers} jogadores. Tente
+            outra sala ou crie a sua.
+          </p>
+          <button className="btn-start" onClick={() => navigate("/")}>
+            <ArrowLeft /> VOLTAR
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   const me = players.find((p) => p.id === myPlayerIdRef.current);
   const myReadyState = me?.is_ready ?? false;
