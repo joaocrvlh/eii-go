@@ -40,29 +40,33 @@ export function Results() {
           const maxPud = Math.max(...rankeados.map((r) => r.puddings));
           const minPud = Math.min(...rankeados.map((r) => r.puddings));
 
-          rankeados = rankeados.map((r) => {
-            let finalScore = r.score;
-            if (r.puddings === maxPud) {
-              const empatadosMax = rankeados.filter(
-                (x) => x.puddings === maxPud,
-              ).length;
-              finalScore += Math.floor(6 / empatadosMax);
-            }
-            if (
-              r.puddings === minPud &&
-              rankeados.length > 2 &&
-              minPud !== maxPud
-            ) {
-              const empatadosMin = rankeados.filter(
-                (x) => x.puddings === minPud,
-              ).length;
-              finalScore -= Math.floor(6 / empatadosMin);
-            }
-            return { ...r, score: finalScore };
-          });
+          if (maxPud > 0) {
+            rankeados = rankeados.map((r) => {
+              let finalScore = r.score;
+              if (r.puddings === maxPud) {
+                const empatadosMax = rankeados.filter(
+                  (x) => x.puddings === maxPud,
+                ).length;
+                finalScore += Math.floor(6 / empatadosMax);
+              }
+              if (
+                r.puddings === minPud &&
+                rankeados.length > 2 &&
+                minPud !== maxPud
+              ) {
+                const empatadosMin = rankeados.filter(
+                  (x) => x.puddings === minPud,
+                ).length;
+                finalScore -= Math.floor(6 / empatadosMin);
+              }
+              return { ...r, score: finalScore };
+            });
+          }
         }
 
-        rankeados.sort((a, b) => b.score - a.score);
+        rankeados.sort(
+          (a, b) => b.score - a.score || b.puddings - a.puddings,
+        );
         setRanking(rankeados);
       }
     };
