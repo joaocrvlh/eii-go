@@ -60,6 +60,7 @@ export function Board() {
           pickStatus={gameState.pickStatus[gameState.myId] ?? false}
           cardCount={gameState.cardCounts[gameState.myId] ?? 0}
           tableCards={gameState.tableCards[gameState.myId] || []}
+          hashiAvailable={gameState.hashiAvailable}
         />
       </main>
     </div>

@@ -10,6 +10,7 @@ interface PlayerSpotProps {
   pickStatus: boolean;
   cardCount: number;
   tableCards: Card[];
+  hashiAvailable?: boolean;
 }
 
 export function PlayerSpot({
@@ -21,9 +22,14 @@ export function PlayerSpot({
   pickStatus,
   cardCount,
   tableCards,
+  hashiAvailable,
 }: PlayerSpotProps) {
   const isWaiting = isMainPlayer ? "Aguardando..." : "Pronto!";
-  const isChoosing = isMainPlayer ? "ESCOLHA 1 CARTA" : "Escolhendo...";
+  const isChoosing = isMainPlayer
+    ? hashiAvailable
+      ? "ESCOLHA 1 OU 2 CARTAS (HASHI)"
+      : "ESCOLHA 1 CARTA"
+    : "Escolhendo...";
   const badgeColor = pickStatus
     ? "var(--wasabi-green)"
     : isMainPlayer
