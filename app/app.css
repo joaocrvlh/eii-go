@@ -876,6 +876,161 @@ body {
   width: 300px;
 }
 
+.room-full-card {
+  align-items: center;
+  text-align: center;
+  gap: 1.5rem;
+}
+
+.room-full-card h2 {
+  font-family: var(--font-logo);
+  font-size: 1.8rem;
+  margin: 0;
+  color: var(--salmon-pink);
+}
+
+.room-full-card p {
+  color: #576574;
+  margin: 0;
+}
+
+.btn-leave-match {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 200;
+  background-color: var(--card-bg);
+  border: 3px solid var(--border-color);
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--nori-dark);
+  box-shadow: 2px 3px 0 var(--border-color);
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.btn-leave-match:hover {
+  transform: scale(1.08);
+  background-color: var(--salmon-pink);
+}
+
+.btn-leave-match:active {
+  transform: scale(0.96);
+}
+
+.btn-leave-match svg {
+  width: 22px;
+  height: 22px;
+}
+
+.player-left-toast {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  background-color: var(--nori-dark);
+  color: #fff;
+  font-family: var(--font-logo);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  animation: slideIn 0.3s ease-out;
+  white-space: nowrap;
+}
+
+.deck-pass-overlay {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5rem;
+  background-color: var(--bg-rice);
+}
+
+.deck-pass-orbit {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  animation: orbitSpin 1.6s linear infinite;
+}
+
+.deck-pass-slot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+}
+
+.deck-pass-slot.slot-1 {
+  transform: rotate(0deg) translate(90px);
+}
+.deck-pass-slot.slot-2 {
+  transform: rotate(90deg) translate(90px);
+}
+.deck-pass-slot.slot-3 {
+  transform: rotate(180deg) translate(90px);
+}
+.deck-pass-slot.slot-4 {
+  transform: rotate(270deg) translate(90px);
+}
+
+.deck-pass-card {
+  position: absolute;
+  width: 50px;
+  height: 75px;
+  margin: -37.5px 0 0 -25px;
+  border: 4px solid var(--border-color);
+  border-radius: 10px;
+  background-color: var(--salmon-pink);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(0, 0, 0, 0.1) 10px,
+    rgba(0, 0, 0, 0.1) 20px
+  );
+  box-shadow: 2px 4px 0 var(--border-color);
+  animation: counterSpin 1.6s linear infinite;
+}
+
+@keyframes orbitSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes counterSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.deck-pass-text {
+  font-family: var(--font-logo);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--nori-dark);
+  letter-spacing: 1px;
+}
+
 .played-mini-card {
   width: 25px;
   height: 38px;
