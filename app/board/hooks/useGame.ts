@@ -4,6 +4,7 @@ import { supabase } from "~/lib/supabase";
 import type { Card, PlayerData, OccupiedSeat } from "../types";
 import { renderHand } from "../utils/engine";
 import { calculateRoundScores } from "../utils/rules";
+import { playSound } from "../utils/sound";
 
 export function useGame(roomId: string) {
   const navigate = useNavigate();
@@ -31,8 +32,9 @@ export function useGame(roomId: string) {
 
   const [timeLeft, setTimeLeft] = useState(10);
   const timeLeftRef = useRef(10);
-  const stagedCardIdRef = useRef<string | null>(null);
+  const stagedCardIdsRef = useRef<string[]>([]);
   const hasCommitted = useRef(false);
+  const [hashiAvailable, setHashiAvailable] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -135,8 +137,27 @@ export function useGame(roomId: string) {
       if (!dbPlayers) return;
 
       for (const p of dbPlayers) {
-        if (p.chosen_card)
-          p.played_cards = [...(p.played_cards || []), p.chosen_card];
+        const chosenCards: Card[] = Array.isArray(p.chosen_card)
+          ? p.chosen_card
+          : p.chosen_card
+            ? [p.chosen_card]
+            : [];
+
+        if (chosenCards.length > 0) {
+          p.played_cards = [...(p.played_cards || []), ...chosenCards];
+        }
+
+        // Hashi: jogar 2 cartas num turno devolve 1 hashi da mesa para a mão,
+        // antes de checar se a rodada acabou e de passar a mão adiante.
+        if (chosenCards.length === 2) {
+          const hashiIndex = p.played_cards.findIndex(
+            (c: Card) => c.type === "chopsticks",
+          );
+          if (hashiIndex !== -1) {
+            const [reclaimedHashi] = p.played_cards.splice(hashiIndex, 1);
+            p.hand = [...(p.hand || []), reclaimedHashi];
+          }
+        }
       }
 
       const isHandEmpty = dbPlayers.every((p) => p.hand.length === 0);
@@ -233,6 +254,8 @@ export function useGame(roomId: string) {
     if (!isLoaded || !myId || engineStarted.current) return;
     engineStarted.current = true;
 
+    playSound("deck-shuffle");
+
     renderHand(`hand-${myId}`, myHandRef.current, "bottom", false);
     occupiedSeats.forEach((seat) => {
       renderHand(
@@ -296,7 +319,13 @@ export function useGame(roomId: string) {
 
     const myHandEl = document.getElementById(`hand-${myId}`);
 
-    stagedCardIdRef.current = null;
+    const hasHashiAvailable = (tableCards[myId] || []).some(
+      (c) => c.type === "chopsticks",
+    );
+    const maxSelectable = hasHashiAvailable ? 2 : 1;
+    setHashiAvailable(hasHashiAvailable);
+
+    stagedCardIdsRef.current = [];
     hasCommitted.current = false;
     timeLeftRef.current = 10;
     setTimeLeft(10);
@@ -306,14 +335,19 @@ export function useGame(roomId: string) {
       hasCommitted.current = true;
 
       const hand = myHandRef.current;
-      const randomCard = hand[Math.floor(Math.random() * hand.length)];
-      const cardId = stagedCardIdRef.current ?? randomCard?.id ?? null;
-      if (!cardId) return;
+      let chosenIds = [...stagedCardIdsRef.current];
+      if (chosenIds.length === 0) {
+        const randomCard = hand[Math.floor(Math.random() * hand.length)];
+        if (randomCard) chosenIds = [randomCard.id];
+      }
 
-      const chosenCard = myHandRef.current.find((c) => c.id === cardId);
-      if (!chosenCard) return;
+      const chosenCards = chosenIds
+        .map((id) => hand.find((c) => c.id === id))
+        .filter((c): c is Card => Boolean(c));
+      if (chosenCards.length === 0) return;
 
-      const newHand = myHandRef.current.filter((c) => c.id !== cardId);
+      const chosenIdSet = new Set(chosenCards.map((c) => c.id));
+      const newHand = hand.filter((c) => !chosenIdSet.has(c.id));
       myHandRef.current = newHand;
       setMyHand(newHand);
       pickStatusRef.current = { ...pickStatusRef.current, [myId]: true };
@@ -321,13 +355,16 @@ export function useGame(roomId: string) {
 
       await supabase
         .from("players")
-        .update({ has_picked: true, chosen_card: chosenCard, hand: newHand })
+        .update({ has_picked: true, chosen_card: chosenCards, hand: newHand })
         .eq("id", myId);
     };
 
     timerRef.current = setInterval(() => {
       timeLeftRef.current -= 1;
       setTimeLeft(timeLeftRef.current);
+      if (timeLeftRef.current === 4) {
+        playSound("countdown");
+      }
       if (timeLeftRef.current <= 0) {
         if (timerRef.current) clearInterval(timerRef.current);
         commitSelection();
@@ -344,19 +381,26 @@ export function useGame(roomId: string) {
       const clickedCardId = cardEl.dataset.cardId;
       if (!clickedCardId) return;
 
-      if (stagedCardIdRef.current === clickedCardId) {
+      const staged = stagedCardIdsRef.current;
+      const existingIndex = staged.indexOf(clickedCardId);
+
+      if (existingIndex !== -1) {
         cardEl.classList.remove("staged");
-        stagedCardIdRef.current = null;
-      } else {
-        if (stagedCardIdRef.current) {
-          const prevEl = document.querySelector(
-            `[data-card-id="${stagedCardIdRef.current}"]`,
-          ) as HTMLElement | null;
-          if (prevEl) prevEl.classList.remove("staged");
-        }
-        cardEl.classList.add("staged");
-        stagedCardIdRef.current = clickedCardId;
+        staged.splice(existingIndex, 1);
+        return;
       }
+
+      if (staged.length >= maxSelectable) {
+        const oldestId = staged.shift();
+        const oldestEl = document.querySelector(
+          `[data-card-id="${oldestId}"]`,
+        ) as HTMLElement | null;
+        if (oldestEl) oldestEl.classList.remove("staged");
+      }
+
+      cardEl.classList.add("staged");
+      staged.push(clickedCardId);
+      playSound("select-card");
     };
 
     if (myHandEl) myHandEl.addEventListener("click", handleCardClick);
@@ -382,5 +426,6 @@ export function useGame(roomId: string) {
     cardCounts,
     tableCards,
     timeLeft,
+    hashiAvailable,
   };
 }
