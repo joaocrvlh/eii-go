@@ -6,6 +6,8 @@ export type PlayerData = {
   avatar: string;
   has_picked?: boolean;
   score?: number;
+  is_host?: boolean;
+  created_at?: string;
 };
 
 export type OccupiedSeat = {
