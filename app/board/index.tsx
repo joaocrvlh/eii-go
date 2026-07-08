@@ -1,68 +1,79 @@
+import { LogOut } from "lucide-react";
 import { useParams } from "react-router";
 import { useGame } from "./hooks/useGame";
 import { Scoreboard } from "./components/scoreboard";
 import { PlayerSpot } from "./components/player-spot";
+import { DeckPassOverlay } from "./components/deck-pass-overlay";
 
 export function Board() {
   const { roomId } = useParams();
   const gameState = useGame(roomId as string);
 
-  if (!gameState.isLoaded) {
-    return (
-      <div
-        style={{
-          width: "100vw",
-          height: "100vh",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        Loading board...
-      </div>
-    );
-  }
+  const handleLeaveClick = () => {
+    if (window.confirm("Tem certeza que deseja sair da partida?")) {
+      gameState.handleLeaveGame();
+    }
+  };
 
   return (
     <div className="board-body">
-      <Scoreboard {...gameState} />
+      <button
+        className="btn-leave-match"
+        onClick={handleLeaveClick}
+        aria-label="Sair da partida"
+        title="Sair da partida"
+      >
+        <LogOut />
+      </button>
 
-      <main className="tabletop">
-        {gameState.timeLeft > 0 && (
-          <div
-            className="center-countdown"
-            data-urgent={gameState.timeLeft <= 3 ? "true" : "false"}
-          >
-            <span>{gameState.timeLeft}</span>
-          </div>
-        )}
+      {gameState.leftPlayerNotice && (
+        <div className="player-left-toast">{gameState.leftPlayerNotice}</div>
+      )}
 
-        {gameState.occupiedSeats.map((seat) => (
-          <PlayerSpot
-            key={seat.player.id}
-            id={seat.player.id}
-            name={seat.player.nome}
-            avatar={seat.player.avatar}
-            position={seat.position}
-            isMainPlayer={false}
-            pickStatus={gameState.pickStatus[seat.player.id] ?? false}
-            cardCount={gameState.cardCounts[seat.player.id] ?? 0}
-            tableCards={gameState.tableCards[seat.player.id] || []}
-          />
-        ))}
+      {!gameState.isLoaded ? (
+        <DeckPassOverlay />
+      ) : (
+        <>
+          <Scoreboard {...gameState} />
 
-        <PlayerSpot
-          id={gameState.myId}
-          name={gameState.myName}
-          avatar={gameState.myAvatar}
-          position="bottom"
-          isMainPlayer={true}
-          pickStatus={gameState.pickStatus[gameState.myId] ?? false}
-          cardCount={gameState.cardCounts[gameState.myId] ?? 0}
-          tableCards={gameState.tableCards[gameState.myId] || []}
-          hashiAvailable={gameState.hashiAvailable}
-        />
-      </main>
+          <main className="tabletop">
+            {gameState.timeLeft > 0 && (
+              <div
+                className="center-countdown"
+                data-urgent={gameState.timeLeft <= 3 ? "true" : "false"}
+              >
+                <span>{gameState.timeLeft}</span>
+              </div>
+            )}
+
+            {gameState.occupiedSeats.map((seat) => (
+              <PlayerSpot
+                key={seat.player.id}
+                id={seat.player.id}
+                name={seat.player.nome}
+                avatar={seat.player.avatar}
+                position={seat.position}
+                isMainPlayer={false}
+                pickStatus={gameState.pickStatus[seat.player.id] ?? false}
+                cardCount={gameState.cardCounts[seat.player.id] ?? 0}
+                tableCards={gameState.tableCards[seat.player.id] || []}
+              />
+            ))}
+
+            <PlayerSpot
+              id={gameState.myId}
+              name={gameState.myName}
+              avatar={gameState.myAvatar}
+              position="bottom"
+              isMainPlayer={true}
+              pickStatus={gameState.pickStatus[gameState.myId] ?? false}
+              cardCount={gameState.cardCounts[gameState.myId] ?? 0}
+              tableCards={gameState.tableCards[gameState.myId] || []}
+              hashiAvailable={gameState.hashiAvailable}
+            />
+          </main>
+        </>
+      )}
     </div>
   );
 }
