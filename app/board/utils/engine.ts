@@ -26,10 +26,12 @@ export function renderHand(
 
     if (cardObj && !isFaceDown) {
       cardEl.dataset.cardId = cardObj.id;
+      cardEl.dataset.cardType = cardObj.type;
       const info = CARD_DICT[cardObj.type] || {
         emoji: "❓",
-        label: "Unknown",
+        label: "Desconhecida",
         color: "#ccc",
+        desc: "",
       };
       cardEl.style.borderTopColor = info.color;
       cardEl.innerHTML = `<div class="card-emoji">${info.emoji}</div><div class="card-label">${info.label}</div>`;
