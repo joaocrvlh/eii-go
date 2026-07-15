@@ -1,7 +1,8 @@
-import { Play, RefreshCw, LogIn } from "lucide-react";
+import { Play, RefreshCw, LogIn, HelpCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { supabase } from "~/lib/supabase";
+import { HowToPlay } from "./how-to-play";
 
 export function CreateGame() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export function CreateGame() {
 
   const [nickname, setNickname] = useState("");
   const [seed, setSeed] = useState("Felix");
+  const [showHowTo, setShowHowTo] = useState(false);
 
   useEffect(() => {
     localStorage.removeItem("eiigo_player_id");
@@ -108,8 +110,18 @@ export function CreateGame() {
               </>
             )}
           </button>
+
+          <button
+            className="btn-how-to-play"
+            onClick={() => setShowHowTo(true)}
+          >
+            <HelpCircle />
+            COMO JOGAR
+          </button>
         </section>
       </main>
+
+      {showHowTo && <HowToPlay onClose={() => setShowHowTo(false)} />}
     </>
   );
 }
