@@ -4,7 +4,10 @@ import { supabase } from "~/lib/supabase";
 import type { Card, PlayerData, OccupiedSeat } from "../types";
 import { renderHand } from "../utils/engine";
 import { calculateRoundScores } from "../utils/rules";
-import { playSound } from "../utils/sound";
+import { playSound, startBgMusic, stopBgMusic } from "../utils/sound";
+import { CARD_DICT } from "../constants";
+
+type CardInfo = { emoji: string; label: string; desc: string };
 
 export function useGame(roomId: string) {
   const navigate = useNavigate();
@@ -39,6 +42,7 @@ export function useGame(roomId: string) {
   const stagedCardIdsRef = useRef<string[]>([]);
   const hasCommitted = useRef(false);
   const [hashiAvailable, setHashiAvailable] = useState(false);
+  const [cardInfo, setCardInfo] = useState<CardInfo | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -50,6 +54,14 @@ export function useGame(roomId: string) {
   useEffect(() => {
     playersRef.current = players;
   }, [players]);
+
+  // Música de fundo da partida: começa ao entrar na mesa e para ao sair
+  // (navegação para resultados, saída da partida ou fechamento).
+  useEffect(() => {
+    if (!isBrowser) return;
+    startBgMusic();
+    return () => stopBgMusic();
+  }, [isBrowser]);
 
   useEffect(() => {
     if (!isBrowser) return;
@@ -525,7 +537,81 @@ export function useGame(roomId: string) {
       });
     }, 1500);
 
+    // Cartas que "combinam" (combo): quando 2 são selecionadas via Hashi e
+    // pontuam juntas, elas são aproximadas na mão. Combinam: mesmo tipo, ou
+    // Wasabi + qualquer nigiri.
+    const NIGIRI_TYPES = new Set([
+      "salmon_nigiri",
+      "squid_nigiri",
+      "egg_nigiri",
+    ]);
+    const isCombo = (typeA?: string, typeB?: string) => {
+      if (!typeA || !typeB) return false;
+      if (typeA === typeB) return true;
+      const hasWasabi = typeA === "wasabi" || typeB === "wasabi";
+      const hasNigiri = NIGIRI_TYPES.has(typeA) || NIGIRI_TYPES.has(typeB);
+      return hasWasabi && hasNigiri;
+    };
+
+    const updateComboLayout = () => {
+      if (!myHandEl) return;
+      myHandEl
+        .querySelectorAll<HTMLElement>(".board-card.combo-pair")
+        .forEach((el) => {
+          el.classList.remove("combo-pair");
+          el.style.removeProperty("--combo-shift");
+        });
+
+      const staged = stagedCardIdsRef.current;
+      if (staged.length !== 2) return;
+
+      const [idA, idB] = staged;
+      const hand = myHandRef.current;
+      const typeA = hand.find((c) => c.id === idA)?.type;
+      const typeB = hand.find((c) => c.id === idB)?.type;
+      if (!isCombo(typeA, typeB)) return;
+
+      const elA = myHandEl.querySelector<HTMLElement>(
+        `[data-card-id="${idA}"]`,
+      );
+      const elB = myHandEl.querySelector<HTMLElement>(
+        `[data-card-id="${idB}"]`,
+      );
+      if (!elA || !elB) return;
+
+      const baseA = parseFloat(elA.style.getPropertyValue("--x")) || 0;
+      const baseB = parseFloat(elB.style.getPropertyValue("--x")) || 0;
+      const mid = (baseA + baseB) / 2;
+      const gap = 32; // aproxima as duas cartas em torno do ponto médio
+      const [leftEl, rightEl] = baseA <= baseB ? [elA, elB] : [elB, elA];
+      const leftBase = Math.min(baseA, baseB);
+      const rightBase = Math.max(baseA, baseB);
+
+      leftEl.style.setProperty("--combo-shift", `${mid - gap - leftBase}px`);
+      rightEl.style.setProperty("--combo-shift", `${mid + gap - rightBase}px`);
+      leftEl.classList.add("combo-pair");
+      rightEl.classList.add("combo-pair");
+    };
+
+    // Abre o modal com a descrição da carta (usado pelo botão direito no
+    // desktop e pelo pressionar-e-segurar no mobile).
+    const openCardInfo = (cardEl: HTMLElement) => {
+      const type = cardEl.dataset.cardType;
+      if (!type) return;
+      const info = CARD_DICT[type];
+      if (info)
+        setCardInfo({ emoji: info.emoji, label: info.label, desc: info.desc });
+    };
+
+    // Evita que o long-press que abriu o modal também selecione a carta no
+    // "click" sintético disparado ao soltar o toque.
+    let suppressNextClick = false;
+
     const handleCardClick = (event: MouseEvent) => {
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        return;
+      }
       if (hasCommitted.current || timeLeftRef.current <= 0) return;
 
       const target = event.target as HTMLElement;
@@ -541,6 +627,7 @@ export function useGame(roomId: string) {
       if (existingIndex !== -1) {
         cardEl.classList.remove("staged");
         staged.splice(existingIndex, 1);
+        updateComboLayout();
         return;
       }
 
@@ -555,14 +642,62 @@ export function useGame(roomId: string) {
       cardEl.classList.add("staged");
       staged.push(clickedCardId);
       playSound("select-card");
+      updateComboLayout();
     };
 
-    if (myHandEl) myHandEl.addEventListener("click", handleCardClick);
+    // Botão direito (desktop): abre um modal central com o que a carta faz.
+    const handleCardContextMenu = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const cardEl = target.closest(".board-card") as HTMLElement;
+      if (!cardEl || !cardEl.dataset.cardType) return;
+      event.preventDefault();
+      openCardInfo(cardEl);
+    };
+
+    // Pressionar e segurar (mobile): abre o mesmo modal após ~450ms.
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearLongPress = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      const target = event.target as HTMLElement;
+      const cardEl = target.closest(".board-card") as HTMLElement;
+      if (!cardEl || !cardEl.dataset.cardType) return;
+      clearLongPress();
+      longPressTimer = setTimeout(() => {
+        openCardInfo(cardEl);
+        suppressNextClick = true;
+        longPressTimer = null;
+      }, 450);
+    };
+
+    if (myHandEl) {
+      myHandEl.addEventListener("click", handleCardClick);
+      myHandEl.addEventListener("contextmenu", handleCardContextMenu);
+      myHandEl.addEventListener("touchstart", handleTouchStart, {
+        passive: true,
+      });
+      myHandEl.addEventListener("touchend", clearLongPress);
+      myHandEl.addEventListener("touchmove", clearLongPress);
+      myHandEl.addEventListener("touchcancel", clearLongPress);
+    }
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       clearInterval(reconcileInterval);
-      if (myHandEl) myHandEl.removeEventListener("click", handleCardClick);
+      clearLongPress();
+      if (myHandEl) {
+        myHandEl.removeEventListener("click", handleCardClick);
+        myHandEl.removeEventListener("contextmenu", handleCardContextMenu);
+        myHandEl.removeEventListener("touchstart", handleTouchStart);
+        myHandEl.removeEventListener("touchend", clearLongPress);
+        myHandEl.removeEventListener("touchmove", clearLongPress);
+        myHandEl.removeEventListener("touchcancel", clearLongPress);
+      }
       supabase.removeChannel(gameChannel);
       supabase.removeChannel(roomChannel);
       engineStarted.current = false;
@@ -583,6 +718,8 @@ export function useGame(roomId: string) {
     timeLeft,
     hashiAvailable,
     leftPlayerNotice,
+    cardInfo,
+    closeCardInfo: () => setCardInfo(null),
     handleLeaveGame,
   };
 }
