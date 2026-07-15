@@ -46,6 +46,10 @@ O projeto é um front-end React (SSR) que fala diretamente com o Supabase (Postg
 - **Timer de turno resiliente a refresh**: a contagem de 10s é ancorada em um timestamp compartilhado, então recarregar a página não reinicia o timer nem trava os outros jogadores esperando.
 - **Reconciliação periódica** do status "escolheu a carta" com o banco, evitando que a partida fique travada em "Aguardando" caso um evento de realtime se perca.
 - **Animação de passagem de baralho** e efeitos sonoros (embaralhar, contagem regressiva, seleção de carta) a cada troca de turno.
+- **Tela "Como Jogar"** acessível na página inicial, com o resumo completo das regras (objetivo, preparação, fluxo da rodada, Hashi e pontuação de cada carta).
+- **Info da carta (botão direito)**: clicar com o botão direito em uma carta da sua mão abre um modal central mostrando o que ela faz.
+- **Agrupamento de combos**: ao selecionar 2 cartas com um Hashi que pontuam juntas (mesmo tipo, ou Wasabi + Nigiri), elas se aproximam na mão.
+- **Música de fundo** (`tradicional-japanese.mp3`) tocando em loop durante a partida.
 
 ---
 
