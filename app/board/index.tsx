@@ -1,4 +1,4 @@
-import { LogOut } from "lucide-react";
+import { LogOut, X } from "lucide-react";
 import { useParams } from "react-router";
 import { useGame } from "./hooks/useGame";
 import { Scoreboard } from "./components/scoreboard";
@@ -28,6 +28,31 @@ export function Board() {
 
       {gameState.leftPlayerNotice && (
         <div className="player-left-toast">{gameState.leftPlayerNotice}</div>
+      )}
+
+      {gameState.cardInfo && (
+        <div
+          className="card-info-overlay"
+          onClick={gameState.closeCardInfo}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="card-info-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="card-info-close"
+              onClick={gameState.closeCardInfo}
+              aria-label="Fechar"
+            >
+              <X />
+            </button>
+            <div className="card-info-emoji">{gameState.cardInfo.emoji}</div>
+            <h3 className="card-info-title">{gameState.cardInfo.label}</h3>
+            <p className="card-info-desc">{gameState.cardInfo.desc}</p>
+          </div>
+        </div>
       )}
 
       {!gameState.isLoaded ? (
