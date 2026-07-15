@@ -862,6 +862,24 @@ body {
   font-size: 0.8rem;
 }
 
+/* Cartas que combinam ficam mais próximas quando selecionadas via Hashi */
+.main-player .board-card.staged.combo-pair {
+  transform: translate(
+      calc(var(--x, 0px) + var(--combo-shift, 0px)),
+      -55px
+    )
+    scale(1.1) rotate(0deg) !important;
+  z-index: 102 !important;
+}
+
+.main-player .board-card.staged.combo-pair:hover {
+  transform: translate(
+      calc(var(--x, 0px) + var(--combo-shift, 0px)),
+      -65px
+    )
+    scale(1.15) rotate(0deg) !important;
+}
+
 .played-cards-area {
   display: flex;
   flex-wrap: wrap;
@@ -1048,4 +1066,272 @@ body {
   width: 35px;
   height: 50px;
   font-size: 1.5rem;
+}
+
+/* Botão "Como Jogar" na tela inicial */
+.btn-how-to-play {
+  background-color: var(--tamago-yellow);
+  color: var(--border-color);
+  font-family: var(--font-logo);
+  font-size: 1.1rem;
+  font-weight: 700;
+  width: 100%;
+  padding: 12px;
+  margin-top: 1rem;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 4px 6px 0 var(--border-color);
+  transition: all 0.1s ease;
+}
+
+.btn-how-to-play:hover {
+  transform: translateY(-2px);
+  box-shadow: 5px 8px 0 var(--border-color);
+}
+
+.btn-how-to-play:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--border-color);
+}
+
+/* Modal "Como Jogar" */
+.howto-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background-color: rgba(30, 41, 59, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: howtoFade 0.2s ease;
+}
+
+@keyframes howtoFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.howto-card {
+  background-color: var(--card-bg);
+  width: 100%;
+  max-width: 460px;
+  max-height: 88vh;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.howto-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background-color: var(--salmon-pink);
+  border-bottom: var(--border-width) solid var(--border-color);
+}
+
+.howto-header h2 {
+  margin: 0;
+  font-family: var(--font-logo);
+  font-size: 1.6rem;
+  color: var(--nori-dark);
+  letter-spacing: -0.5px;
+}
+
+.howto-close {
+  background-color: var(--card-bg);
+  border: 3px solid var(--border-color);
+  border-radius: var(--radius-circle);
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--border-color);
+  box-shadow: 2px 3px 0 var(--border-color);
+  transition: transform 0.15s ease;
+}
+
+.howto-close:hover {
+  transform: rotate(90deg);
+}
+
+.howto-body {
+  padding: 1.25rem;
+  overflow-y: auto;
+}
+
+.howto-section {
+  margin-bottom: 1.5rem;
+}
+
+.howto-section:last-child {
+  margin-bottom: 0;
+}
+
+.howto-section h3 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-logo);
+  font-size: 1.15rem;
+  color: var(--nori-dark);
+}
+
+.howto-section p {
+  margin: 0.25rem 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: #475569;
+}
+
+.howto-list {
+  margin: 0.5rem 0;
+  padding-left: 1.4rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.howto-note {
+  background-color: #fff8ec;
+  border: 2px solid var(--tamago-yellow);
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.88rem !important;
+  margin-top: 0.75rem !important;
+}
+
+.howto-scoring {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.howto-score-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background-color: #f8f3e6;
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0.6rem 0.75rem;
+}
+
+.howto-score-emoji {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.howto-score-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.howto-score-text strong {
+  font-family: var(--font-logo);
+  font-size: 0.95rem;
+  color: var(--nori-dark);
+}
+
+.howto-score-text span {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: #475569;
+}
+
+/* Modal de informação da carta (clique com botão direito) */
+.card-info-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background-color: rgba(30, 41, 59, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: howtoFade 0.15s ease;
+}
+
+.card-info-modal {
+  position: relative;
+  background-color: var(--card-bg);
+  width: 100%;
+  max-width: 320px;
+  padding: 2rem 1.5rem 1.75rem;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: cardInfoPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes cardInfoPop {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.card-info-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: var(--card-bg);
+  border: 3px solid var(--border-color);
+  border-radius: var(--radius-circle);
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--border-color);
+  box-shadow: 2px 3px 0 var(--border-color);
+  transition: transform 0.15s ease;
+}
+
+.card-info-close:hover {
+  transform: rotate(90deg);
+}
+
+.card-info-emoji {
+  font-size: 3.5rem;
+  line-height: 1;
+  margin-bottom: 0.75rem;
+}
+
+.card-info-title {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-logo);
+  font-size: 1.5rem;
+  color: var(--nori-dark);
+}
+
+.card-info-desc {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: #475569;
 }
